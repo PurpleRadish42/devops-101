@@ -4,7 +4,7 @@ import { GuestbookForm } from "./guestbook-form";
 // Render on every request (on the server), never at build time.
 export const dynamic = "force-dynamic";
 
-const TITLE = "Welcome to DevOps 101"; // 👈 change me live in the PR demo
+const TITLE = "Hello Intruder"; // 👈 change me live in the PR demo
 
 async function loadData(): Promise<{ info: Info; entries: Entry[] } | null> {
   try {
