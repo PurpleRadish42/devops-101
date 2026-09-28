@@ -1,2 +1,22 @@
 personal/
 *.pptx
+
+# Secrets / per-environment config (the example is committed)
+.env
+.env.*
+!deploy/.env.example
+
+# Node / Next.js
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+.DS_Store

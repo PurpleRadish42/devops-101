@@ -1,0 +1,15 @@
+# Caddy = web server + reverse proxy with automatic HTTPS (Let's Encrypt).
+# {$DOMAIN} is read from the environment, e.g. `sudo systemctl edit caddy` and add:
+#   [Service]
+#   Environment=DOMAIN=devops101.example.com
+# ...or simply replace {$DOMAIN} below with your real domain.
+
+# Production: https://example.com -> frontend container on port 3000
+{$DOMAIN} {
+	reverse_proxy localhost:3000
+}
+
+# Staging: https://staging.example.com -> frontend container on port 3001
+staging.{$DOMAIN} {
+	reverse_proxy localhost:3001
+}

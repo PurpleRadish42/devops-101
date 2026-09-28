@@ -1,0 +1,59 @@
+# One file describes the whole app: 4 containers on one private network.
+# Run locally:  docker compose up --build   ->  http://localhost:3000
+
+services:
+  frontend:
+    build: ./frontend # build the image from ./frontend/Dockerfile...
+    image: ghcr.io/purpleradish42/devops-101-frontend:${IMAGE_TAG:-latest} # ...or pull this tag on the server
+    environment:
+      BACKEND_URL: http://backend:8000 # service name = hostname on the compose network
+      APP_ENV: ${APP_ENV:-local}
+      APP_VERSION: ${IMAGE_TAG:-dev}
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000" # only reachable from this machine (Caddy proxies it)
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    image: ghcr.io/purpleradish42/devops-101-backend:${IMAGE_TAG:-latest}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-devops101}:${POSTGRES_PASSWORD:-devops101}@postgres:5432/${POSTGRES_DB:-devops101}
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: ${APP_ENV:-local}
+      APP_VERSION: ${IMAGE_TAG:-dev}
+    # No `ports:` - only the frontend talks to the backend, over the internal network
+    depends_on:
+      postgres:
+        condition: service_healthy # wait until the DB actually accepts connections
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-devops101}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devops101} # safe local default; set a real one on the server
+      POSTGRES_DB: ${POSTGRES_DB:-devops101}
+    volumes:
+      - pgdata:/var/lib/postgresql/data # data survives container restarts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata: # named volume, managed by Docker

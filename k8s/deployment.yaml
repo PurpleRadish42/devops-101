@@ -1,0 +1,68 @@
+# The backend on Kubernetes. Compare with the `backend:` service in docker-compose.yaml.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels:
+    app: backend
+spec:
+  replicas: 3 # run 3 copies (compose runs 1)
+  strategy:
+    type: RollingUpdate # replace pods gradually on a new version
+    rollingUpdate:
+      maxSurge: 1 # at most 1 extra pod during an update
+      maxUnavailable: 0 # never drop below 3 ready pods -> zero downtime
+  selector:
+    matchLabels:
+      app: backend # which pods belong to this Deployment
+  template: # the pod blueprint, roughly one compose "service"
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/purpleradish42/devops-101-backend:latest # like `image:` in compose
+          imagePullPolicy: IfNotPresent # use a locally built image if present (OrbStack)
+          ports:
+            - containerPort: 8000
+          env: # like `environment:` in compose
+            - name: DATABASE_URL
+              value: postgresql://devops101:devops101@postgres:5432/devops101 # demo only: use a Secret in real life
+            - name: REDIS_URL
+              value: redis://redis:6379/0
+            - name: APP_ENV
+              value: local
+            - name: APP_VERSION
+              value: dev
+          resources:
+            requests: # guaranteed minimum, used by the scheduler (and the HPA)
+              cpu: 100m # 0.1 CPU core
+              memory: 128Mi
+            limits: # hard ceiling: throttled on CPU, killed on memory
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe: # "ready for traffic?" - if not, removed from the Service
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 5
+          livenessProbe: # "still alive?" - if not, the container is restarted
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+# A stable name + load balancer in front of the 3 pods (like the service name in compose).
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  type: ClusterIP # internal only, like not publishing `ports:` in compose
+  selector:
+    app: backend # send traffic to pods with this label
+  ports:
+    - port: 8000 # the Service's port -> http://backend:8000
+      targetPort: 8000 # the container's port

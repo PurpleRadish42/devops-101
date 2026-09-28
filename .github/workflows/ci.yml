@@ -1,0 +1,57 @@
+# CI = Continuous Integration: check every pull request before it can be merged.
+name: CI
+
+on: # WHEN does this run?
+  pull_request:
+    branches: [main] # every PR that targets main
+  workflow_dispatch: # plus a manual "Run workflow" button
+
+jobs: # WHAT runs - these 3 jobs run in parallel
+  frontend:
+    runs-on: ubuntu-latest # a fresh Linux VM from GitHub, thrown away afterwards
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7 # get the code
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci # install exact versions from package-lock.json
+      - run: npm run lint
+      - run: npm run build # also type-checks the code
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt pytest httpx2
+      - run: python -m pytest # quick tests, no database needed
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build frontend image (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: frontend
+          push: false
+          cache-from: type=gha,scope=frontend # reuse layers cached by CD
+      - name: Build backend image (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: backend
+          push: false
+          cache-from: type=gha,scope=backend

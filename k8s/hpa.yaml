@@ -1,0 +1,21 @@
+# Autoscale the backend between 2 and 10 pods based on CPU usage.
+# Needs: `resources.requests.cpu` set in deployment.yaml (usage is measured as a % of it)
+#        and metrics-server running in the cluster (`kubectl top pods` should work).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend
+spec:
+  scaleTargetRef: # what to scale
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70 # add pods when average CPU > 70% of requests
